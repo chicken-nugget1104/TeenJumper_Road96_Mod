@@ -1,4 +1,4 @@
-﻿using BepInEx.Logging;
+using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
 using BlueEyes.Entities;
 using HarmonyLib;
@@ -28,6 +28,9 @@ namespace TeenJumper_Road96_Mod
     }
     public class ModMain : MonoBehaviour
     {
+        private CharacterController characterController;
+        private float flySpeed = 10f;
+
         void Awake()
         {
             TeenJumperMod.Log.LogInfo("loading Teen Jumper");
@@ -40,15 +43,18 @@ namespace TeenJumper_Road96_Mod
         {
             if (TeenJumperMod.scenename != "") {
                 Scene scene = SceneManager.GetSceneByName(TeenJumperMod.scenename);
-                GameObject mainlogic = null;
                 if (scene.isLoaded) {
                     GameObject[] gos = scene.GetRootGameObjects();
                     foreach (var go in gos) {
                         if (go.name.Contains("Logic") || go.name.Contains("LOGIC")) {
-                            mainlogic = go;
-                            for (int i = 0; i < mainlogic.transform.childCount; i++) {
-                                if (mainlogic.transform.GetChild(i).gameObject.name.Equals("Player")) {
-                                    TeenJumperMod.playerobj = mainlogic.transform.GetChild(i).gameObject;
+                            for (int i = 0; i < go.transform.childCount; i++) {
+                                if (go.transform.GetChild(i).gameObject.name.Equals("Player")) {
+                                    TeenJumperMod.playerobj = go.transform.GetChild(i).gameObject;
+                                    characterController = TeenJumperMod.playerobj.GetComponent<CharacterController>();
+                                    if (characterController != null)
+                                    {
+                                        characterController.enabled = false; // Disable collision
+                                    }
                                     TeenJumperMod.scenename = "";
                                     break;
                                 }
@@ -58,10 +64,16 @@ namespace TeenJumper_Road96_Mod
                     }
                 }
             }
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Space)) {
-                if (TeenJumperMod.playerobj != null && TeenJumperMod.playerobj.GetComponent<UnityEngine.CharacterController>().isGrounded && !TeenJumperMod.playerobj.GetComponent<PlayerBlueEyes>()._freezed) {
-                    TeenJumperMod.playerobj.GetComponent<UnityEngine.CharacterController>().Move(new Vector3(0, 2, 0));
-                }
+
+            if (TeenJumperMod.playerobj != null)
+            {
+                Vector3 move = new Vector3(
+                    Input.GetAxis("Horizontal"),
+                    (Input.GetKey(KeyCode.Space) ? 1 : 0) - (Input.GetKey(KeyCode.LeftControl) ? 1 : 0),
+                    Input.GetAxis("Vertical")
+                );
+                
+                TeenJumperMod.playerobj.transform.position += move * flySpeed * Time.deltaTime;
             }
         }
     }
@@ -70,52 +82,23 @@ namespace TeenJumper_Road96_Mod
     {
         static void Postfix(string sceneName, LoadSceneMode mode)
         {
-            // These are scenes that are logic but doesn't have a player object in which cause errors
             string[] bannedscene = {
                 "000_Game/Scenes/SONYA_4/SONYA_4_Logic",
                 "000_Game/Scenes/ALEX_1/ALEX_1_Logic",
                 "000_Game/Scenes/GEN_DRIVE_1/GEN_DRIVE_1_LOGIC"
             };
-            // These are scenes that are also logic scenes but without the "_Logic" at the end of the name
-            string[] logicscene = {
-                    "000_Game/Scenes/JAROD_9/JAROD_9",
-                    "000_Game/Scenes/ZOE_4/ZOE_4",
-                    "000_Game/Scenes/BORDERS/BORDER_ZOE",
-                    "000_Game/Scenes/BORDERS/BorderExit_Zoe/BORDEREXIT_ZOE",
-                    "000_Game/Scenes/BORDERS/BorderExit_CreditGold/BorderExit_CreditGold",
-                    "000_Game/Scenes/SONYA_8/SONYA_8",
-                    "000_Game/Scenes/BORDERS/BORDER_FINAL",
-                    "000_Game/Scenes/ZOE_1/ZOE_1",
-                    "000_Game/Scenes/ALEX_7/ALEX_7",
-                    "000_Game/Scenes/FANNY_9/FANNY_9",
-                    "000_Game/Scenes/STANMITCH_9/STANMITCH_9"
-            };
-            string[] tokens = null;
-            bool islogicscene = false;
-
+            
             TeenJumperMod.playerobj = null;
             foreach (string i in bannedscene) {
                 if (sceneName == i) {
                     return;
                 }
             }
-            if (sceneName.ToString().Contains("Logic") || sceneName.ToString().Contains("LOGIC")) {
-                tokens = sceneName.Split('/');
+            
+            if (sceneName.Contains("Logic") || sceneName.Contains("LOGIC")) {
+                string[] tokens = sceneName.Split('/');
                 if (SceneManager.GetSceneByName(sceneName) != null) {
                     TeenJumperMod.scenename = tokens[3];
-                }
-            } else {
-                foreach (string i in logicscene) {
-                    if (sceneName == i) {
-                        islogicscene = true;
-                        break;
-                    }
-                }
-                if (islogicscene) {
-                    tokens = sceneName.Split('/');
-                    if (SceneManager.GetSceneByName(sceneName) != null) {
-                        TeenJumperMod.scenename = tokens[3];
-                    }
                 }
             }
         }
